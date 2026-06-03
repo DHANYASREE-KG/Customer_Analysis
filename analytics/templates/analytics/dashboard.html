@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>E-Commerce Sales Intelligence Dashboard</title>
+  {% load static %}
+  <script src="{% static 'analytics/plotly.min.js' %}"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:#F7F8FA;color:#1A1A2E;}
+    header{background:linear-gradient(135deg,#1A1A2E 0%,#16213E 60%,#0F3460 100%);
+            color:#fff;padding:28px 40px;}
+    header h1{font-size:24px;font-weight:700;margin-bottom:6px;}
+    header p{font-size:13px;opacity:.75;max-width:700px;}
+    .kpi-bar{display:flex;gap:14px;padding:20px 40px;flex-wrap:wrap;
+              background:#fff;border-bottom:1px solid #E5E7EB;align-items:center;}
+    .kpi{background:#F7F8FA;border:1px solid #E5E7EB;border-radius:10px;
+          padding:14px 22px;min-width:130px;}
+    .kpi-label{font-size:11px;color:#6B7280;text-transform:uppercase;
+                letter-spacing:.06em;margin-bottom:4px;}
+    .kpi-value{font-size:22px;font-weight:700;color:#1A1A2E;}
+    .filter-badge{background:#0F3460;color:#fff;border-radius:20px;
+                   padding:8px 16px;font-size:13px;display:none;
+                   align-items:center;gap:8px;margin-left:auto;}
+    .filter-badge .reset{cursor:pointer;font-weight:700;font-size:16px;
+                          opacity:.7;transition:opacity .2s;}
+    .filter-badge .reset:hover{opacity:1;}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px;
+             padding:20px 40px;}
+    .grid-1{padding:20px 40px;}
+    .card{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.07);
+           padding:10px;overflow:hidden;min-height:200px;}
+    .section-title{font-size:13px;font-weight:600;letter-spacing:.06em;
+                    text-transform:uppercase;color:#6B7280;
+                    padding:0 40px;margin:10px 0 2px;}
+    .error-box{background:#FEE2E2;border:1px solid #FCA5A5;border-radius:8px;
+                padding:20px;margin:20px 40px;color:#991B1B;}
+    .loading{text-align:center;padding:60px;color:#9CA3AF;font-size:14px;}
+    footer{text-align:center;padding:20px;font-size:12px;color:#9CA3AF;}
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>E-Commerce Sales Intelligence Dashboard</h1>
+  <p>Django + SQLite + Plotly &nbsp;|&nbsp; 10,000 orders &middot; 2021-2023 &middot; 20 Indian states</p>
+</header>
+
+{% if error %}
+<div class="error-box">
+  <strong>Error:</strong> {{ error }}
+  <br>Run: <code>python manage.py import_data</code> to load the data first.
+</div>
+{% else %}
+
+<div class="kpi-bar">
+  <div class="kpi"><div class="kpi-label">Total Revenue</div>
+    <div class="kpi-value" id="kpi-revenue">{{ kpi_revenue }}</div></div>
+  <div class="kpi"><div class="kpi-label">Total Profit</div>
+    <div class="kpi-value" id="kpi-profit">{{ kpi_profit }}</div></div>
+  <div class="kpi"><div class="kpi-label">Total Orders</div>
+    <div class="kpi-value" id="kpi-orders">{{ kpi_orders }}</div></div>
+  <div class="kpi"><div class="kpi-label">Unique Customers</div>
+    <div class="kpi-value" id="kpi-customers">{{ kpi_customers }}</div></div>
+  <div class="kpi"><div class="kpi-label">Profit Margin</div>
+    <div class="kpi-value" id="kpi-margin">{{ kpi_margin }}</div></div>
+  <div class="filter-badge" id="filterBadge">
+    Showing: <span id="selectedState"></span>
+    <span class="reset" onclick="resetFilter()">&times;</span>
+  </div>
+</div>
+
+<div class="section-title">State Revenue &amp; Hierarchy</div>
+<div class="grid-2">
+  <div class="card" id="bar-card">{{ fig_bar|safe }}</div>
+  <div class="card" id="sunburst-card">{{ fig_sun|safe }}</div>
+</div>
+
+<div class="section-title">Revenue Trends</div>
+<div class="grid-1">
+  <div class="card" id="anim-card">{{ fig_anim|safe }}</div>
+</div>
+
+<div class="section-title">Product Performance</div>
+<div class="grid-2">
+  <div class="card" id="bubble-card">{{ fig_bubble|safe }}</div>
+  <div class="card" id="rfm-card">{{ fig_rfm|safe }}</div>
+</div>
+
+
+<div class="section-title">Distribution &amp; Regional Analysis</div>
+<div class="grid-2">
+  <div class="card" id="category-card">{{ fig_category|safe }}</div>
+  <div class="card" id="region-card">{{ fig_region|safe }}</div>
+</div>
+
+<div class="section-title">Profitability Analysis</div>
+<div class="grid-2">
+  <div class="card" id="profit-card">{{ fig_profit|safe }}</div>
+  <div class="card" id="discount-card">{{ fig_discount|safe }}</div>
+</div>
+
+<div class="section-title">Trends &amp; Patterns</div>
+<div class="grid-1">
+  <div class="card" id="trend-card">{{ fig_trend|safe }}</div>
+</div>
+
+<div class="section-title">State-wise Performance</div>
+<div class="grid-1">
+  <div class="card" id="heatmap-card">{{ fig_heatmap|safe }}</div>
+</div>
+
+<div class="section-title">Product Performance Matrix</div>
+<div class="grid-1">
+  <div class="card" id="product-card">{{ fig_product|safe }}</div>
+</div>
+
+{% if fig_rfm_heat %}
+<div class="section-title">Customer Segment Analysis</div>
+<div class="grid-2">
+  <div class="card" id="rfm-heat-card">{{ fig_rfm_heat|safe }}</div>
+  <div class="card" id="customer-dist-card">{{ fig_customer_dist|safe }}</div>
+</div>
+{% endif %}
+
+{% endif %}
+
+<footer>
+  Built with Django &middot; SQLite &middot; Pandas &middot; NumPy &middot; Matplotlib &middot; Seaborn &middot; Plotly
+</footer>
+
+<script>
+let currentState = "";
+
+function setHTML(container, html) {
+  container.innerHTML = html;
+  container.querySelectorAll("script").forEach(function(old) {
+    var s = document.createElement("script");
+    s.textContent = old.textContent;
+    old.parentNode.replaceChild(s, old);
+  });
+}
+
+var barGd = document.querySelector("#bar-card .plotly-graph-div");
+if (barGd) {
+  barGd.on("plotly_click", function(event) {
+    if (!event.points || event.points.length === 0) return;
+    var pt = event.points[0];
+    if (!pt.y || !pt.x || pt.x <= 0) return;
+    filterByState(pt.y);
+  });
+}
+
+function filterByState(state) {
+  currentState = state;
+  document.getElementById("selectedState").textContent = state;
+  document.getElementById("filterBadge").style.display = "flex";
+
+  var cards = ["sunburst-card", "anim-card", "bubble-card", "dd-card"];
+  cards.forEach(function(id) {
+    document.getElementById(id).innerHTML = '<div class="loading">Loading...</div>';
+  });
+
+  fetch("/state/" + encodeURIComponent(state) + "/")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) return;
+    setHTML(document.getElementById("sunburst-card"), data.fig_sun);
+      setHTML(document.getElementById("anim-card"), data.fig_anim);
+      setHTML(document.getElementById("bubble-card"), data.fig_bubble);
+      setHTML(document.getElementById("dd-card"), data.fig_dd);
+      // Update matplotlib charts if present
+      if (data.fig_category) setHTML(document.getElementById("category-card"), data.fig_category);
+      if (data.fig_region) setHTML(document.getElementById("region-card"), data.fig_region);
+      if (data.fig_profit) setHTML(document.getElementById("profit-card"), data.fig_profit);
+      if (data.fig_discount) setHTML(document.getElementById("discount-card"), data.fig_discount);
+      if (data.fig_trend) setHTML(document.getElementById("trend-card"), data.fig_trend);
+      if (data.fig_heatmap) setHTML(document.getElementById("heatmap-card"), data.fig_heatmap);
+      if (data.fig_product) setHTML(document.getElementById("product-card"), data.fig_product);
+      if (data.fig_rfm_heat) setHTML(document.getElementById("rfm-heat-card"), data.fig_rfm_heat);
+      if (data.fig_customer_dist) setHTML(document.getElementById("customer-dist-card"), data.fig_customer_dist);
+      document.getElementById("kpi-revenue").textContent = data.kpi_revenue;
+      document.getElementById("kpi-profit").textContent = data.kpi_profit;
+      document.getElementById("kpi-orders").textContent = data.kpi_orders;
+      document.getElementById("kpi-margin").textContent = data.kpi_margin;
+    });
+}
+
+function resetFilter() {
+  currentState = "";
+  document.getElementById("filterBadge").style.display = "none";
+  location.reload();
+}
+</script>
+</body>
+</html>
